@@ -19,6 +19,23 @@
   var pending = [];        // attachments staged for the next post
   var unsubscribe = null;
 
+  /* Who wrote a post. There is nowhere to keep an identity — nothing is
+     written to this machine — so it lasts as long as the tab and no longer.
+     The token is random, travels inside the sealed body, and is meaningless
+     to anyone without the code. What it buys is being able to tell one
+     poster from another within a thread; reload and you are a new person,
+     which is the honest ceiling for a board with no accounts and no storage. */
+  var me = C.b64(crypto.getRandomValues(new Uint8Array(16)));
+
+  /* Media is fetched and unsealed only when asked for. Off means even the
+     small preview waits for a click. Like everything else, it resets with
+     the tab. */
+  var autoMedia = true;
+  /* What has already been revealed in the open thread. A thread redraws
+     whenever a post arrives, and without this an attachment someone chose to
+     open would fold itself back up under a Show button each time. */
+  var revealed = {};
+
   function say(msg) { $('status').textContent = msg || ''; }
 
   function when(iso) {
@@ -90,6 +107,8 @@
     say('');
 
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    releaseURLs();
+    revealed = {};
     $('posts').innerHTML = '';
     try { posts = await Store.listPosts(t.id); }
     catch (e) { console.error(e); posts = []; say('Could not load this thread.'); }
@@ -108,6 +127,19 @@
     $('lockBar').hidden = !locked;
     $('compose').hidden = locked;
     if (locked) $('codeInput').value = '';
+  }
+
+  /* Numbers are assigned in the order people first appear in the thread, so
+     everyone holding the code sees the same Anonymous 3. */
+  function authorNames() {
+    var seen = {}, n = 0, out = {};
+    posts.forEach(function (row) {
+      var p = opened[row.id];
+      if (!p || p.broken || !p.who) return;
+      if (!seen[p.who]) { seen[p.who] = 'Anonymous ' + (++n); }
+      out[row.id] = seen[p.who];
+    });
+    return out;
   }
 
   /* ---------- posts ---------- */
@@ -139,7 +171,11 @@
           catch (e) { opened[row.id] = { broken: true }; }
         }
         if (mine !== renderSeq) return;          // overtaken; drop this one
-        frag.appendChild(key ? drawOpen(row, opened[row.id]) : drawSealed(row));
+      }
+      var names = key ? authorNames() : {};
+      for (var j = 0; j < posts.length; j++) {
+        var r2 = posts[j];
+        frag.appendChild(key ? drawOpen(r2, opened[r2.id], names[r2.id]) : drawSealed(r2));
       }
     }
 
@@ -164,15 +200,24 @@
     return el;
   }
 
-  function drawOpen(row, payload) {
+  function drawOpen(row, payload, name) {
     var el = document.createElement('div');
     el.className = 'post';
-    var w = document.createElement('span');
-    w.className = 'when';
+
+    var head = document.createElement('span');
+    head.className = 'when';
+    if (name) {
+      var who = document.createElement('b');
+      who.className = 'who';
+      who.textContent = name;
+      if (payload && payload.who === me) who.classList.add('mine');
+      head.appendChild(who);
+      head.appendChild(document.createTextNode(' · '));
+    }
     // the authenticated time if the post carries one, the server's if not
     var stamp = (payload && payload.at) ? new Date(payload.at).toISOString() : row.created_at;
-    w.textContent = when(stamp);
-    el.appendChild(w);
+    head.appendChild(document.createTextNode(when(stamp)));
+    el.appendChild(head);
 
     if (!payload || payload.broken) {
       var bad = document.createElement('p');
@@ -188,18 +233,14 @@
       linkify(p, payload.text);
       el.appendChild(p);
     }
-    (payload.files || []).forEach(function (f) {
-      var fig = document.createElement('figure');
-      var img = document.createElement('img');
-      img.alt = f.name || 'attached image';
-      img.loading = 'lazy';
-      fig.appendChild(img);
-      var cap = document.createElement('figcaption');
-      cap.textContent = 'decrypting…';
-      fig.appendChild(cap);
-      el.appendChild(fig);
-      showFile(f, img, cap);
-    });
+
+    var files = payload.files || [];
+    if (files.length) {
+      var grid = document.createElement('div');
+      grid.className = 'media';
+      files.forEach(function (f) { grid.appendChild(mediaTile(f)); });
+      el.appendChild(grid);
+    }
     return el;
   }
 
@@ -220,20 +261,189 @@
     if (at < text.length) host.appendChild(document.createTextNode(text.slice(at)));
   }
 
-  async function showFile(f, img, cap) {
+  function newFileId(n) {
+    return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + n) + '.bin';
+  }
+
+  /* A still frame, scaled down. Images give one directly; a video gives its
+     first frame, which is the only way to show something before fetching
+     however many megabytes the whole clip is. Anything that will not decode
+     simply has no preview and shows as a card instead. */
+  async function frameOf(file) {
+    if ((file.type || '').indexOf('image/') === 0) {
+      try { return await createImageBitmap(file); } catch (e) { return null; }
+    }
+    if ((file.type || '').indexOf('video/') !== 0) return null;
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file), v = document.createElement('video');
+      var done = function (out) { URL.revokeObjectURL(url); resolve(out); };
+      v.preload = 'metadata';
+      v.muted = true;
+      v.playsInline = true;
+      v.onloadeddata = function () {
+        try { v.currentTime = Math.min(0.1, (v.duration || 1) / 10); }
+        catch (e) { done(null); }
+      };
+      v.onseeked = function () { done(v); };
+      v.onerror = function () { done(null); };
+      setTimeout(function () { done(null); }, 5000);   // a codec the browser will not decode
+      v.src = url;
+    });
+  }
+
+  async function makeThumb(file) {
+    var frame = await frameOf(file);
+    if (!frame) return null;
+    var w0 = frame.videoWidth || frame.width, h0 = frame.videoHeight || frame.height;
+    if (!w0 || !h0) return null;
+    var max = CFG.thumbMax || 480, scale = Math.min(1, max / Math.max(w0, h0));
+    var w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    try { c.getContext('2d').drawImage(frame, 0, 0, w, h); } catch (e) { return null; }
+    if (frame.close) frame.close();
+    var blob = await new Promise(function (r) { c.toBlob(r, 'image/jpeg', 0.72); });
+    if (!blob) return null;
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), w: w, h: h };
+  }
+
+  /* ---------- media ----------
+     Nothing about an attachment is fetched until it is wanted. A post carries
+     a small sealed preview alongside the sealed original, so a thread of
+     photographs costs a few kilobytes to read rather than a few megabytes,
+     and the original is only ever fetched when someone asks to see it full
+     size. With automatic loading off, even the preview waits to be asked. */
+
+  function bytesLabel(n) {
+    if (!n && n !== 0) return '';
+    var u = ['B', 'KB', 'MB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i ? n.toFixed(1) : n) + ' ' + u[i];
+  }
+  function kindOf(f) {
+    var t = f.type || '';
+    if (t.indexOf('video/') === 0) return 'video';
+    if (t === 'image/gif') return 'gif';
+    if (t.indexOf('image/') === 0) return 'image';
+    return 'file';
+  }
+
+  function mediaTile(f) {
+    var tile = document.createElement('figure');
+    tile.className = 'tile';
+
+    var frame = document.createElement('div');
+    frame.className = 'frame';
+    tile.appendChild(frame);
+
+    var cap = document.createElement('figcaption');
+    var kind = kindOf(f);
+    cap.textContent = (f.name || kind) + (f.size ? ' · ' + bytesLabel(f.size) : '');
+    tile.appendChild(cap);
+
+    if (kind === 'video' || kind === 'gif') {
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = kind === 'video' ? 'VIDEO' : 'GIF';
+      frame.appendChild(badge);
+    }
+
+    var reveal = document.createElement('button');
+    reveal.type = 'button';
+    reveal.className = 'reveal';
+    reveal.textContent = 'Show';
+    frame.appendChild(reveal);
+
+    var loaded = false;
+    async function preview() {
+      if (loaded) return;
+      loaded = true;
+      revealed[f.id] = true;
+      reveal.remove();
+      var note = document.createElement('span');
+      note.className = 'loading';
+      note.textContent = 'unsealing…';
+      frame.appendChild(note);
+      try {
+        var src = f.thumb ? f.thumb.id : f.id;
+        var url = await openAsURL(src, f.thumb ? 'image/jpeg' : (f.type || ''));
+        note.remove();
+        var img = document.createElement('img');
+        img.alt = f.name || '';
+        img.src = url;
+        frame.insertBefore(img, frame.firstChild);
+        frame.classList.add('ready');
+        frame.onclick = function () { openFull(f); };
+        frame.title = 'Show full size';
+      } catch (e) {
+        note.textContent = 'this attachment did not open with the thread key';
+      }
+    }
+
+    reveal.onclick = preview;
+    if (autoMedia || revealed[f.id]) preview();
+    return tile;
+  }
+
+  /* Fetch, unseal, and hand back an object URL. The URLs are tracked so a
+     thread that has been scrolled through does not leave blobs behind. */
+  var liveURLs = [];
+  async function openAsURL(id, type) {
+    var blob = await Store.getFile(id);
+    if (!blob) throw new Error('missing');
+    var bytes = await C.openBytes(keys[current.id], current.id, blob);
+    var url = URL.createObjectURL(new Blob([bytes], { type: type || 'application/octet-stream' }));
+    liveURLs.push(url);
+    return url;
+  }
+  function releaseURLs() {
+    liveURLs.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+    liveURLs = [];
+  }
+
+  /* ---------- full size ---------- */
+  var viewerURL = null;
+  async function openFull(f) {
+    var body = $('viewerBody'), dlg = $('viewer');
+    body.replaceChildren();
+    $('viewerName').textContent = (f.name || '') + (f.size ? ' · ' + bytesLabel(f.size) : '');
+    var note = document.createElement('p');
+    note.className = 'loading';
+    note.textContent = 'unsealing the original…';
+    body.appendChild(note);
+    if (!dlg.open) dlg.showModal();
     try {
-      var blob = await Store.getFile(f.id);
-      if (!blob) { cap.textContent = 'attachment missing from the store'; return; }
-      var bytes = await C.openBytes(keys[current.id], current.id, blob);
-      var url = URL.createObjectURL(new Blob([bytes], { type: f.type || 'application/octet-stream' }));
-      img.src = url;
-      img.onload = function () { URL.revokeObjectURL(url); };
-      cap.textContent = f.name || '';
+      var url = await openAsURL(f.id, f.type);
+      if (viewerURL) { try { URL.revokeObjectURL(viewerURL); } catch (e) {} }
+      viewerURL = url;
+      var el;
+      if (kindOf(f) === 'video') {
+        el = document.createElement('video');
+        el.controls = true;
+        el.playsInline = true;
+        el.src = url;
+      } else {
+        el = document.createElement('img');
+        el.alt = f.name || '';
+        el.src = url;
+      }
+      body.replaceChildren(el);
     } catch (e) {
-      console.error(e);
-      cap.textContent = 'this attachment did not open with the thread key';
+      note.textContent = 'that attachment did not open with the thread key';
     }
   }
+  $('viewerClose').onclick = function () { $('viewer').close(); };
+  $('viewer').addEventListener('close', function () {
+    $('viewerBody').replaceChildren();
+    if (viewerURL) { try { URL.revokeObjectURL(viewerURL); } catch (e) {} viewerURL = null; }
+  });
+  // clicking the backdrop rather than the picture closes it
+  $('viewer').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+
+  $('autoMedia').onchange = function () {
+    autoMedia = this.checked;
+    if (autoMedia) drawPosts();
+  };
 
   /* ---------- unlocking ---------- */
   $('showCodeBtn').onclick = function () {
@@ -271,8 +481,9 @@
   $('attachBtn').onclick = function () { $('fileInput').click(); };
   $('fileInput').onchange = function () {
     [].forEach.call(this.files, function (f) {
-      if (f.size > (CFG.maxFileBytes || 5242880)) {
-        say('“' + f.name + '” is larger than the ' + Math.round((CFG.maxFileBytes || 5242880) / 1048576) + ' MB limit and was not attached.');
+      var cap = CFG.maxFileBytes || 20971520;
+      if (f.size > cap) {
+        say('“' + f.name + '” is larger than the ' + Math.round(cap / 1048576) + ' MB limit and was not attached.');
         return;
       }
       pending.push(f);
@@ -310,16 +521,28 @@
       var key = keys[current.id], files = [];
       for (var i = 0; i < pending.length; i++) {
         var f = pending[i];
-        var sealed = await C.sealBytes(key, current.id, new Uint8Array(await f.arrayBuffer()));
-        var id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + i) + '.bin';
-        await Store.putFile(id, sealed);
-        files.push({ id: id, name: f.name, type: f.type, size: f.size });
+        var entry = { name: f.name, type: f.type, size: f.size };
+
+        /* The preview is made here, once, and sealed on its own. Readers then
+           fetch a few kilobytes to see a thread rather than everything in it,
+           and the original is only ever fetched by someone who asks for it. */
+        var thumb = await makeThumb(f);
+        if (thumb) {
+          var tid = newFileId(i) + '.t';
+          await Store.putFile(tid, await C.sealBytes(key, current.id, thumb.bytes));
+          entry.thumb = { id: tid, w: thumb.w, h: thumb.h };
+        }
+
+        var id = newFileId(i);
+        await Store.putFile(id, await C.sealBytes(key, current.id, new Uint8Array(await f.arrayBuffer())));
+        entry.id = id;
+        files.push(entry);
       }
       /* The server supplies created_at, and a hostile one could supply
          whatever it liked. The author's own clock goes inside the sealed
          body, where it cannot be edited without failing the tag, and that is
          the time shown when it is there. */
-      var body = await C.sealPost(key, current.id, { v: 1, at: Date.now(), text: text, files: files });
+      var body = await C.sealPost(key, current.id, { v: 1, at: Date.now(), who: me, text: text, files: files });
       var row = await Store.createPost({ thread_id: current.id, body: body });
 
       $('postText').value = '';

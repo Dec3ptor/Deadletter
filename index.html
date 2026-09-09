@@ -37,11 +37,12 @@
 
     <form class="compose" id="compose" hidden>
       <label class="vh" for="postText">Your post</label>
-      <textarea id="postText" placeholder="Write something. Links become links; images can be attached."></textarea>
+      <textarea id="postText" placeholder="Write something. Links become links; images and video can be attached."></textarea>
       <div class="attached" id="attached"></div>
       <div class="composebar">
-        <input type="file" id="fileInput" accept="image/*" multiple hidden>
-        <button class="btn small" id="attachBtn" type="button">Attach image</button>
+        <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
+        <button class="btn small" id="attachBtn" type="button">Attach</button>
+        <label class="toggle"><input type="checkbox" id="autoMedia" checked> Load media automatically</label>
         <span class="grow"></span>
         <button class="btn solid" id="postBtn" type="submit">Post</button>
       </div>
@@ -50,6 +51,14 @@
 </div>
 
 <p id="status" role="status"></p>
+
+<dialog id="viewer">
+  <div class="viewerbar">
+    <span id="viewerName"></span>
+    <button class="btn small" id="viewerClose" type="button">Close</button>
+  </div>
+  <div id="viewerBody" class="viewerbody"></div>
+</dialog>
 
 <dialog id="newDialog">
   <form method="dialog" class="dlg" id="newForm">
