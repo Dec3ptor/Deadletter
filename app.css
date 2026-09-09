@@ -1,0 +1,182 @@
+/* ============================================================
+   Deadletter — the board.
+
+   Two panes: threads on the left, the open thread on the right. On a phone
+   they become one pane at a time, because a 320px column of thread titles
+   next to a 320px column of posts is neither.
+   ============================================================ */
+
+.board{
+  display:grid;
+  grid-template-columns:290px minmax(0,1fr);
+  gap:0;
+  border:2px solid var(--ink);
+  margin:26px 0 60px;
+  min-height:min(74vh,760px);
+}
+
+/* ---------- the rail ---------- */
+.rail{
+  border-right:2px solid var(--ink);
+  display:flex;flex-direction:column;min-width:0;
+  background:var(--paper);
+}
+.railhead{
+  display:flex;align-items:center;gap:10px;
+  padding:13px 14px;border-bottom:1px solid var(--g25);
+}
+.railhead h2{
+  margin:0;font-size:13px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--g70);flex:1;
+}
+.raillist{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1}
+.raillist li{border-bottom:1px solid var(--g12)}
+
+.thread{
+  display:block;width:100%;text-align:left;background:none;border:0;
+  padding:13px 14px;cursor:pointer;font-family:var(--sans);color:var(--ink);
+  border-left:3px solid transparent;
+}
+.thread:hover{background:var(--g06)}
+.thread[aria-current="true"]{border-left-color:var(--ink);background:var(--g06)}
+.thread .t{
+  display:block;font-size:15px;font-weight:600;letter-spacing:-.01em;
+  line-height:1.3;margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.thread .m{
+  display:flex;gap:8px;align-items:center;
+  font-family:var(--mono);font-size:11.5px;color:var(--g70);
+}
+.thread .m .open{color:var(--ink);font-weight:600}
+
+.railempty{padding:20px 14px;font-size:14px;color:var(--g70);line-height:1.5}
+
+/* ---------- the thread ---------- */
+.view{display:flex;flex-direction:column;min-width:0}
+.viewhead{
+  padding:14px 18px;border-bottom:1px solid var(--g25);
+  display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;
+}
+.viewhead h2{
+  margin:0;font-size:20px;font-weight:700;letter-spacing:-.022em;
+  line-height:1.25;flex:1;min-width:0;word-break:break-word;
+}
+.backbtn{display:none}
+
+.state{
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 8px;border:1.5px solid var(--ink);white-space:nowrap;
+}
+.state.open{background:var(--ink);color:var(--paper)}
+
+.posts{flex:1;overflow-y:auto;padding:6px 18px 18px}
+.viewempty{
+  padding:44px 18px;color:var(--g70);font-size:15px;line-height:1.6;
+  max-width:52ch;
+}
+.viewempty strong{display:block;color:var(--ink);font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:7px}
+
+.post{border-bottom:1px solid var(--g12);padding:15px 0}
+.post:last-child{border-bottom:0}
+.post .when{
+  font-family:var(--mono);font-size:11.5px;color:var(--g70);
+  display:block;margin-bottom:6px;
+}
+.post .text{
+  font-family:var(--serif);font-size:17px;line-height:1.6;
+  margin:0;white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.post .text a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:3px}
+.post figure{margin:11px 0 0}
+.post img{display:block;max-width:100%;border:1px solid var(--g25)}
+.post figcaption{font-family:var(--mono);font-size:11.5px;color:var(--g70);margin-top:5px}
+
+/* Locked posts show the real stored ciphertext, not a stand-in. What is on
+   screen is exactly what the server holds and what anyone else can fetch. */
+.cipher{
+  font-family:var(--mono);font-size:12px;line-height:1.45;
+  color:var(--g50);background:var(--g06);
+  border:1px solid var(--g12);padding:9px 10px;margin:0;
+  /* pre keeps its whitespace but must still wrap, or the ciphertext reads as
+     one clipped line instead of the block of bytes it actually is. */
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  overflow:hidden;max-height:4.6em;
+}
+.post.locked .when{color:var(--g50)}
+
+/* ---------- composing ---------- */
+.compose{border-top:2px solid var(--ink);padding:12px 18px;background:var(--paper)}
+.compose textarea{
+  width:100%;min-height:74px;resize:vertical;
+  font-family:var(--sans);font-size:16px;line-height:1.5;color:var(--ink);
+  padding:11px 12px;border:1.5px solid var(--ink);border-radius:0;
+  background:var(--paper);
+}
+.compose textarea::placeholder{color:var(--g50)}
+.composebar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.composebar .grow{flex:1}
+.attached{
+  display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;
+  font-family:var(--mono);font-size:12px;color:var(--g70);
+}
+.attached span{border:1px solid var(--g25);padding:4px 7px;display:flex;gap:7px;align-items:center}
+.attached button{border:0;background:none;cursor:pointer;font-size:14px;line-height:1;color:var(--ink);padding:0}
+
+/* ---------- the unlock bar ---------- */
+.lockbar{
+  border-top:2px solid var(--ink);padding:12px 18px;
+  display:flex;gap:9px;align-items:center;flex-wrap:wrap;
+}
+.lockbar input{
+  flex:1 1 240px;min-width:0;
+  font-family:var(--mono);font-size:15px;line-height:1;color:var(--ink);
+  padding:11px 12px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper);
+  -webkit-appearance:none;appearance:none;
+}
+.lockbar input::placeholder{color:var(--g50);font-family:var(--sans)}
+
+/* ---------- the new-thread dialog ---------- */
+dialog{
+  border:2px solid var(--ink);padding:0;background:var(--paper);color:var(--ink);
+  max-width:520px;width:calc(100% - 32px);
+}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:20px}
+.dlg h2{margin:0 0 6px;font-size:23px;letter-spacing:-.025em}
+.dlg p{margin:0 0 16px;font-size:15px;color:var(--g70);line-height:1.5}
+.dlg label{display:block;font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--g70);margin:0 0 6px}
+.dlg input{
+  width:100%;font-size:16px;line-height:1;color:var(--ink);
+  padding:11px 12px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper);
+  -webkit-appearance:none;appearance:none;
+}
+.dlg input.code{font-family:var(--mono);font-size:14px}
+.dlg .field{margin-bottom:15px}
+.dlg .row{display:flex;gap:8px}
+.dlg .row input{flex:1;min-width:0}
+.dlg .actions{display:flex;gap:9px;justify-content:flex-end;margin-top:19px}
+
+.strength{font-size:13px;margin:7px 0 0;min-height:1.3em;color:var(--g70)}
+.strength.weak{color:var(--ink);font-weight:600}
+
+.keepsafe{
+  border:2px solid var(--ink);padding:12px 13px;margin:15px 0 0;
+  font-size:14px;line-height:1.5;
+}
+.keepsafe b{font-weight:600}
+.keepsafe .code{
+  font-family:var(--mono);font-size:13px;word-break:break-all;
+  display:block;margin:7px 0 0;padding:8px 9px;background:var(--g06);border:1px solid var(--g25);
+}
+
+/* ---------- phone ---------- */
+@media(max-width:760px){
+  .board{grid-template-columns:1fr;min-height:0}
+  .rail{border-right:0;border-bottom:2px solid var(--ink);max-height:44vh}
+  body[data-pane="view"] .rail{display:none}
+  body[data-pane="rail"] .view{display:none}
+  body[data-pane="view"] .backbtn{display:inline-block}
+  .posts{padding:6px 14px 14px}
+  .viewhead,.compose,.lockbar{padding-left:14px;padding-right:14px}
+}

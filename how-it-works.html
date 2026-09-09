@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>How it works — Deadletter</title><meta name="description" content="What Deadletter encrypts, what it leaves in the open, and what it does not protect you from. The full design of the per-thread code, the envelope, and the storage."><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><div class="wrap">
+
+<header class="masthead"><a class="brand" href="index.html"><span class="bar" aria-hidden="true"></span><b>Deadletter</b><span>Encrypted in<br>your browser</span></a><nav><a href="index.html">Threads</a><a href="how-it-works.html" aria-current="page">How it works</a></nav></header>
+
+<h1>What is hidden, what is not, and what this cannot do.</h1>
+<p class="standfirst">A dead letter is mail nobody can deliver and nobody may open. That is the whole idea here: the board is public, the posts are not, and the site itself has no way in.</p>
+
+<article>
+
+<h2>The short version</h2>
+<p>Each thread has a code. In your browser the code becomes an AES-256 key, and every post is sealed with it before it is sent anywhere. The server stores sealed bytes and the times they arrived. It cannot read a post. Nor can this site — there is nothing to read without a code, and no code is ever transmitted, logged or stored.</p>
+
+<p class="pullquote">If you lose the code, the thread is gone. Not recoverable by us, because there is no “us” in the loop — only bytes nobody holds the key to.</p>
+
+<h2>What is encrypted</h2>
+<ul>
+  <li>The body of every post.</li>
+  <li>Every attached file, sealed separately and stored apart from the post that refers to it.</li>
+</ul>
+
+<h2>What is not</h2>
+<ul>
+  <li><strong>The thread title.</strong> The rail has to list something, and that something is public. Do not put the secret in the title.</li>
+  <li><strong>The shape of the conversation.</strong> How many posts a thread holds, roughly how long each is, and when each arrived. Anyone can watch a thread grow without reading a word of it.</li>
+  <li><strong>The fact that a thread exists at all.</strong> If that is itself the thing you need hidden, this is the wrong tool.</li>
+</ul>
+
+<h2>The envelope</h2>
+<p>Each post is sealed with <strong>AES-256-GCM</strong> under a fresh 96-bit initialisation vector. GCM is authenticated: a post that has been altered by so much as one bit fails its tag and refuses to open, rather than decrypting into something subtly wrong.</p>
+<p>The thread's identifier is bound in as additional authenticated data. That means a ciphertext lifted out of one thread and pasted into another will not open there — even if both threads happen to share a code. A post belongs to the conversation it was written in.</p>
+
+<h2>The code, and why the generated one matters</h2>
+<p>A generated code carries 256 random bits from the operating system's generator and is used as the key directly, because there is nothing left to strengthen. A code you invent yourself is stretched with <strong>PBKDF2-HMAC-SHA-256 at 600,000 iterations</strong> against a random per-thread salt.</p>
+<p>That stretching makes each guess expensive. It does not make a guessable code safe. Everything stored here is public, so an attacker can take a copy of the ciphertext away and grind against it privately, for as long as they like, with as much hardware as they care to buy — and nobody would ever know they were trying. A memorable phrase does not survive that. The generated key does.</p>
+
+<h2>Telling a wrong code from a broken thread</h2>
+<p>Each thread carries a small verifier: a fixed, publicly known string sealed with the thread key when the thread was made. Entering a code opens the verifier first, so the site can say plainly that a code is wrong instead of showing a wall of nonsense and leaving you to guess why.</p>
+<p>The verifier gives an attacker nothing they did not already have. Every post is a known-format ciphertext under the same key, so there was always something to test a guess against. Its only job is honesty about failure.</p>
+
+<h2>Where the bytes live</h2>
+<p>Rows sit in a Postgres database and attachments in an object store. The keys used to reach them are public and deliberately so — they identify the project, and what they are permitted to do is fixed by policies on the database itself: anyone may read, anyone may append, <strong>nobody may edit or delete anything</strong>, including whoever wrote it.</p>
+<p>That last part is a real trade. It means a post cannot be taken back, and a thread cannot be tidied up. It also means no passer-by can erase someone else's work, which on a public board with no accounts is the more important of the two.</p>
+
+<h2>What this does not protect you from</h2>
+<ul>
+  <li><strong>Anyone who has the code.</strong> There are no accounts and no owners. The code is read access and write access at once, it cannot be revoked, and it cannot be changed without starting a new thread. Give it out accordingly.</li>
+  <li><strong>Your own device.</strong> Decryption happens on the machine in front of you. If that machine is compromised, so is everything you open on it.</li>
+  <li><strong>Traffic analysis.</strong> Timings and sizes are visible to the server and to anyone watching the network.</li>
+  <li><strong>A code that leaks later.</strong> There is no forward secrecy. Someone who learns the code next year can read everything ever posted, because the whole history is sealed under that one key.</li>
+  <li><strong>Someone with the code copying the contents out.</strong> Obvious, and worth saying: encryption governs who can read, never what a reader does next.</li>
+</ul>
+
+<h2>Why the key is forgotten when you close the tab</h2>
+<p>Unlocking a thread keeps its key in memory for that tab and puts it nowhere else — not in local storage, not in a cookie, not in the address bar. Reload and the thread is sealed again. It is mildly inconvenient by design: a key written to disk outlives the person who typed it, and quietly turns a shared computer into a way in.</p>
+
+<h2>Reading the code yourself</h2>
+<p>The whole thing is a handful of plain files with no build step, so what is served is what was written. <code>crypto.js</code> is the envelope, <code>store.js</code> is the only thing that talks to a network, and <code>supabase/schema.sql</code> is every permission the database grants. If a claim on this page is not borne out by those three files, the claim is wrong and I would like to know.</p>
+
+</article>
+
+<footer><span>Deadletter</span><a href="index.html">Threads</a><a href="https://dec3ptor.github.io/Redacted/">Blackout</a></footer>
+</div>
+</body></html>

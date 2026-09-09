@@ -1,0 +1,152 @@
+/* ============================================================
+   Deadletter — shared styles
+   Monochrome. Inter Tight for interface, Newsreader for prose.
+   The same system as Blackout, so the two sites read as siblings.
+   ============================================================ */
+
+:root{
+  --paper:#FFFFFF;
+  --ink:#000000;
+  --g70:#5E5E5E;
+  --g50:#8A8A8A;
+  --g25:#CFCFCF;
+  --g12:#E6E6E6;
+  --g06:#F4F4F4;
+  --sans:'Inter Tight',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --measure:66ch;
+}
+
+*{box-sizing:border-box}
+/* A class that sets display outranks the browser's own [hidden] rule, so any
+   element toggled with .hidden = true stays on screen. Settle it once here
+   rather than remembering a guard on every new component. */
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:17px;
+  line-height:1.55;
+}
+img{max-width:100%}
+
+.wrap{max-width:880px;margin:0 auto;padding:0 22px}
+.wrap.wide{max-width:1240px}
+
+/* Visually hidden, still read aloud. Labels that would only repeat what the
+   control already says out loud belong here rather than on screen. */
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- focus ---------- */
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+/* ---------- masthead + nav ---------- */
+.masthead{padding:22px 0 0}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink)}
+.brand .bar{width:44px;height:15px;background:var(--ink);display:block;flex:none}
+.brand b{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.brand>span:last-of-type{font-size:13px;color:var(--g70);margin-left:auto;text-align:right;line-height:1.3}
+
+nav{
+  display:flex;gap:24px;flex-wrap:wrap;
+  margin-top:18px;padding-bottom:10px;
+  border-bottom:2px solid var(--ink);
+}
+nav a{
+  font-size:15px;font-weight:500;color:var(--g70);
+  text-decoration:none;padding-bottom:9px;margin-bottom:-12px;
+  border-bottom:2px solid transparent;
+}
+nav a:hover{color:var(--ink)}
+nav a[aria-current="page"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+
+/* ---------- headings ---------- */
+h1{
+  font-size:clamp(31px,6.4vw,48px);
+  line-height:1.08;letter-spacing:-.035em;font-weight:700;
+  margin:34px 0 16px;max-width:19ch;
+}
+h2{font-size:clamp(22px,4vw,29px);line-height:1.2;letter-spacing:-.025em;font-weight:700;margin:44px 0 12px}
+h3{font-size:19px;line-height:1.3;letter-spacing:-.015em;font-weight:600;margin:30px 0 8px}
+.standfirst{font-size:19px;line-height:1.5;color:var(--g70);max-width:58ch;margin:0 0 30px}
+
+/* ---------- prose ---------- */
+article{max-width:var(--measure)}
+article p,article li{font-family:var(--serif);font-size:19px;line-height:1.65}
+article p{margin:0 0 18px}
+article ul,article ol{padding-left:22px;margin:0 0 20px}
+article li{margin-bottom:9px}
+article a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:3px}
+article strong{font-weight:600}
+
+.pullquote{
+  border-left:3px solid var(--ink);
+  padding:2px 0 2px 20px;margin:26px 0;
+  font-family:var(--serif);font-size:22px;line-height:1.4;
+}
+.caselist{list-style:none;padding:0;margin:26px 0}
+.caselist li{
+  border-top:1px solid var(--g25);padding:20px 0;margin:0;
+  font-family:var(--sans);font-size:17px;line-height:1.55;
+}
+.caselist li:last-child{border-bottom:1px solid var(--g25)}
+.caselist .year{
+  font-family:var(--mono);font-size:13px;color:var(--g70);
+  display:block;margin-bottom:3px;
+}
+.caselist .case{font-weight:600;display:block;margin-bottom:5px;font-size:18px}
+.caselist p{font-family:var(--serif);font-size:17px;margin:0;color:var(--g70)}
+
+/* ---------- generic controls ---------- */
+button{font-family:var(--sans)}
+.btn{
+  font-size:15px;font-weight:600;line-height:1;
+  padding:11px 16px;border:1.5px solid var(--ink);
+  background:var(--paper);color:var(--ink);cursor:pointer;
+  border-radius:0;white-space:nowrap;
+}
+.btn:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+.btn:disabled{opacity:.3;cursor:default}
+.btn.solid{background:var(--ink);color:var(--paper)}
+.btn.solid:hover:not(:disabled){background:var(--g70);border-color:var(--g70)}
+.btn.small{font-size:13px;padding:8px 12px;border-width:1px}
+
+/* ---------- dropzone ---------- */
+.drop{
+  border:2px dashed var(--ink);
+  padding:52px 24px;text-align:center;cursor:pointer;
+  margin:0 0 14px;background:var(--paper);
+}
+.drop:hover,.drop.hot{background:var(--g06)}
+.drop.hot{border-style:solid}
+.drop strong{display:block;font-size:21px;font-weight:600;letter-spacing:-.02em;margin-bottom:5px}
+.drop span{display:block;font-size:15px;color:var(--g70)}
+
+.assurance{
+  border:1px solid var(--ink);padding:14px 16px;
+  font-size:15px;line-height:1.5;margin:0 0 40px;max-width:var(--measure);
+}
+.assurance b{font-weight:600}
+
+.note{font-size:15px;color:var(--g70);max-width:var(--measure)}
+#status{font-family:var(--mono);font-size:14px;margin:16px 0;min-height:1.2em}
+
+/* ---------- footer ---------- */
+footer{
+  border-top:2px solid var(--ink);margin-top:70px;padding:20px 0 60px;
+  font-size:14px;color:var(--g70);
+  display:flex;gap:20px;flex-wrap:wrap;
+}
+footer a{color:var(--g70)}
+
+@media(max-width:640px){
+  body{font-size:16px}
+  article p,article li{font-size:18px}
+  .drop{padding:38px 18px}
+  nav{gap:18px}
+  nav a{font-size:14px}
+}
