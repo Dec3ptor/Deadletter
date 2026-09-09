@@ -15,8 +15,8 @@ window.DEADLETTER_CONFIG = Object.assign({
   productName: 'Deadletter',
   siteUrl: 'https://dec3ptor.github.io/Deadletter/',
 
-  supabaseUrl: 'https://YOUR-PROJECT.supabase.co',
-  supabaseAnonKey: 'YOUR-ANON-KEY',
+  supabaseUrl: 'https://xspljgydqkddxflymknh.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzcGxqZ3lkcWtkZHhmbHlta25oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDMwOTIsImV4cCI6MjEwNDUxOTA5Mn0.BVqDtkQaYgiKcTkgmX3q2gz0k8t2Ui2Nbt2cxkl1VPM',
 
   // Largest attachment accepted, before encryption.
   maxFileBytes: 5 * 1024 * 1024

@@ -176,14 +176,29 @@
         return id;
       },
       async getFile(id) {
-        var res = await fetch(base + '/storage/v1/object/public/files/' + id);
+        /* A public object needs no credentials. Sending them anyway costs
+           nothing and keeps this working if the bucket is ever closed. */
+        var res = await fetch(base + '/storage/v1/object/public/files/' + id, {
+          headers: { apikey: CFG.supabaseAnonKey, Authorization: 'Bearer ' + CFG.supabaseAnonKey }
+        });
         if (!res.ok) return null;
         return new Uint8Array(await res.arrayBuffer());
       },
       /* Realtime over a websocket when it is available, and a poll behind it
          so a blocked socket degrades to slow rather than to silence. */
+      /* Two ways to hear about a new post. The socket delivers it at once when
+         it connects; the poll behind it delivers it regardless. The socket is
+         therefore treated as an optimisation and never as a requirement — a
+         network that blocks websockets, or a project with realtime switched
+         off, should make the board slower, not silent, and should not fill the
+         console with failures on a path nothing depends on. */
       subscribe(threadId, onPost) {
-        var stopped = false, socket = null, seen = null;
+        var stopped = false, socket = null, beat = null, seen = null;
+
+        function fresh(row) {
+          if (!stopped && row && row.thread_id === threadId) onPost(row);
+        }
+
         try {
           var url = base.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' +
             encodeURIComponent(CFG.supabaseAnonKey) + '&vsn=1.0.0';
@@ -191,19 +206,27 @@
           socket.onopen = function () {
             socket.send(JSON.stringify({
               topic: 'realtime:posts:' + threadId, event: 'phx_join', ref: '1',
-              payload: { config: { postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'posts', filter: 'thread_id=eq.' + threadId }] } }
+              payload: {
+                config: { postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'posts', filter: 'thread_id=eq.' + threadId }] },
+                access_token: CFG.supabaseAnonKey
+              }
             }));
-            setInterval(function () {
-              if (socket.readyState === 1) socket.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: '0' }));
+            beat = setInterval(function () {
+              if (socket && socket.readyState === 1)
+                socket.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: '0' }));
+              else { clearInterval(beat); beat = null; }
             }, 25000);
           };
           socket.onmessage = function (ev) {
             try {
               var msg = JSON.parse(ev.data);
               var rec = msg && msg.payload && msg.payload.data && msg.payload.data.record;
-              if (rec && rec.thread_id === threadId) onPost(rec);
+              if (rec) fresh(rec);
             } catch (e) {}
           };
+          // Expected often enough not to be worth reporting; the poll covers it.
+          socket.onerror = function () {};
+          socket.onclose = function () { if (beat) { clearInterval(beat); beat = null; } };
         } catch (e) { socket = null; }
 
         var h = setInterval(async function () {
@@ -211,13 +234,16 @@
           try {
             var rows = await this.listPosts(threadId);
             if (seen === null) { seen = rows.length; return; }
-            if (rows.length > seen) { rows.slice(seen).forEach(onPost); seen = rows.length; }
+            if (rows.length > seen) { rows.slice(seen).forEach(fresh); seen = rows.length; }
           } catch (e) {}
-        }.bind(this), 8000);
+        }.bind(this), 5000);
 
         return function () {
-          stopped = true; clearInterval(h);
-          try { if (socket) socket.close(); } catch (e) {}
+          stopped = true;
+          clearInterval(h);
+          if (beat) { clearInterval(beat); beat = null; }
+          try { if (socket) { socket.onclose = null; socket.close(); } } catch (e) {}
+          socket = null;
         };
       }
     };

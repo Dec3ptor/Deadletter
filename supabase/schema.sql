@@ -82,18 +82,41 @@ create policy posts_append   on public.posts   for insert with check (true);
 -- ---------- attachments ----------
 -- Encrypted bytes, one object per file, named by a random id the post body
 -- refers to. Public read is fine: without the thread code the bytes are noise.
-insert into storage.buckets (id, name, public)
-     values ('files', 'files', true)
-on conflict (id) do update set public = true;
+--
+-- The rest of this file is wrapped so that a failure here cannot take the
+-- tables with it. The SQL editor runs a script as one transaction: if a later
+-- statement errors, everything before it is rolled back too, and you are left
+-- believing the tables were made when they were not. Storage and realtime are
+-- exactly where that bites — they depend on extensions and ownership that vary
+-- between projects, and neither is needed for text threads to work.
+do $$
+begin
+  insert into storage.buckets (id, name, public)
+       values ('files', 'files', true)
+  on conflict (id) do update set public = true;
+exception when others then
+  raise notice 'Could not create the files bucket (%). Text threads still work; make a public bucket named files under Storage to enable attachments.', sqlerrm;
+end $$;
 
-drop policy if exists files_read   on storage.objects;
-drop policy if exists files_append on storage.objects;
-
-create policy files_read   on storage.objects for select
-  using (bucket_id = 'files');
-create policy files_append on storage.objects for insert
-  with check (bucket_id = 'files');
+do $$
+begin
+  drop policy if exists files_read   on storage.objects;
+  drop policy if exists files_append on storage.objects;
+  create policy files_read   on storage.objects for select
+    using (bucket_id = 'files');
+  create policy files_append on storage.objects for insert
+    with check (bucket_id = 'files');
+exception when others then
+  raise notice 'Could not set storage policies (%). Set them under Storage → Policies if attachments fail.', sqlerrm;
+end $$;
 
 -- ---------- realtime ----------
--- Lets the thread view receive new posts without polling.
-alter publication supabase_realtime add table public.posts;
+-- Lets the thread view receive new posts the moment they arrive. Entirely
+-- optional: the board polls as well, so without this new posts show up within
+-- a few seconds instead of instantly.
+do $$
+begin
+  alter publication supabase_realtime add table public.posts;
+exception when others then
+  raise notice 'Realtime not enabled for posts (%). The board polls instead.', sqlerrm;
+end $$;
