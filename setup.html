@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect a project — Deadletter</title><meta name="description" content="Point Deadletter at a Supabase project and check, from your own browser, that every part of it actually answers."><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="app.css"></head><body><div class="wrap">
+
+<header class="masthead"><a class="brand" href="index.html"><span class="bar" aria-hidden="true"></span><b>Deadletter</b><span>Encrypted in<br>your browser</span></a><nav><a href="index.html">Threads</a><a href="setup.html" aria-current="page">Connect</a><a href="how-it-works.html">How it works</a></nav></header>
+
+<h1>Point it at your project.</h1>
+<p class="standfirst">Two values, then a set of checks that run from this browser against the real project — the same requests the site makes, with the same key, under the same policies.</p>
+
+<article>
+  <h2>First, create the tables</h2>
+  <p>In your Supabase dashboard: <strong>SQL Editor</strong> → <strong>New query</strong>. Paste the entire contents of <code>supabase/schema.sql</code> from this repository, and press <strong>Run</strong>. It makes two tables, the attachment bucket, and the policies that let anyone read and append while nobody may edit or delete.</p>
+  <p>You should see <em>Success. No rows returned</em>. Running it twice is harmless.</p>
+
+  <h2>Then paste the two values</h2>
+  <p>Dashboard → <strong>Project Settings</strong> → <strong>API</strong>. You need the <strong>Project URL</strong> and the key labelled <strong>anon</strong> <strong>public</strong>.</p>
+  <p>That key is meant to be public — it goes into a file anyone can read, and the policies decide what it may do. The one below it, <code>service_role</code>, bypasses every policy and must never be published. This page refuses it if you paste it by mistake.</p>
+</article>
+
+<div class="setupform">
+  <div class="field">
+    <label for="urlInput">Project URL</label>
+    <input id="urlInput" type="url" spellcheck="false" autocomplete="off" placeholder="https://abcdefghijkl.supabase.co">
+  </div>
+  <div class="field">
+    <label for="keyInput">anon public key</label>
+    <input id="keyInput" class="code" type="text" spellcheck="false" autocomplete="off" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…">
+  </div>
+  <div class="setupbar">
+    <button class="btn solid" id="checkBtn" type="button">Check the connection</button>
+    <button class="btn" id="saveBtn" type="button" hidden>Use it in this browser</button>
+    <button class="btn" id="clearBtn" type="button" hidden>Forget it</button>
+  </div>
+</div>
+
+<p id="setupStatus" role="status"></p>
+
+<div id="results" hidden>
+  <ul class="checks" id="checks"></ul>
+</div>
+
+<div id="snippetBox" hidden>
+  <h2>To make it live for everyone</h2>
+  <p class="note">Saving above only affects this browser. For the published site, put these two lines into <code>config.js</code>, replacing the placeholders, and commit.</p>
+  <pre class="snippet" id="snippet"></pre>
+  <button class="btn small" id="copyBtn" type="button">Copy</button>
+</div>
+
+<article>
+  <h2>If a check fails</h2>
+  <p>Each failing row says what is wrong and what fixes it. Nearly always the answer is that <code>supabase/schema.sql</code> has not been run yet, or has been run against a different project than the URL above.</p>
+  <p>None of this touches the encryption. A misconfigured project means the board cannot store or fetch anything; it never means a post goes out readable. Sealing happens before the store is ever called.</p>
+</article>
+
+<footer><span>Deadletter</span><a href="index.html">Threads</a><a href="how-it-works.html">How it works</a></footer>
+</div>
+
+<script src="config.js"></script>
+<script src="setup.js"></script>
+</body></html>

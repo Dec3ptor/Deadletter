@@ -13,9 +13,18 @@
 (function () {
   'use strict';
 
-  var CFG = window.DEADLETTER_CONFIG || {};
+  /* Settings pasted into the setup page win over the committed ones, so a
+     project can be tried out in one browser before its keys are committed for
+     everyone. Nothing secret lives here — see config.js on why the anon key is
+     a public value. */
+  function saved() {
+    try { return JSON.parse(localStorage.getItem('deadletter.config') || 'null'); }
+    catch (e) { return null; }
+  }
+  var CFG = Object.assign({}, window.DEADLETTER_CONFIG || {}, saved() || {});
+  window.DEADLETTER_CONFIG = CFG;
   var configured = !!(CFG.supabaseUrl && CFG.supabaseAnonKey &&
-    CFG.supabaseUrl.indexOf('YOUR-') === -1);
+    CFG.supabaseUrl.indexOf('YOUR-') === -1 && CFG.supabaseAnonKey.indexOf('YOUR-') === -1);
 
   function nowISO() { return new Date().toISOString(); }
   function uuid() {
