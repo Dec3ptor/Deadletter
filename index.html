@@ -18,10 +18,24 @@
     <div class="viewhead">
       <button class="btn small backbtn" id="backBtn" type="button">Threads</button>
       <h2 id="viewTitle">Deadletter</h2>
+      <button class="btn small" id="filesBtn" type="button" hidden>Attachments</button>
       <span class="state" id="viewState" hidden>Locked</span>
     </div>
 
-    <div class="posts" id="posts"></div>
+    <div class="findbar" id="findBar" hidden>
+      <label class="vh" for="findInput">Search this thread</label>
+      <input id="findInput" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Search this thread — or type:image, has:file">
+      <span class="findcount" id="findCount"></span>
+      <button class="btn small" id="findClear" type="button" hidden>Clear</button>
+    </div>
+
+    <div class="postswrap">
+      <div class="posts" id="posts"></div>
+      <button class="jump" id="jumpBtn" type="button" hidden>
+        <span id="jumpLabel">Jump to latest</span>
+      </button>
+    </div>
 
     <div class="viewempty" id="viewEmpty">
       <strong>Pick a thread, or start one.</strong>
@@ -51,6 +65,14 @@
 </div>
 
 <p id="status" role="status"></p>
+
+<dialog id="files">
+  <div class="viewerbar">
+    <span id="filesTitle">Attachments</span>
+    <button class="btn small" id="filesClose" type="button">Close</button>
+  </div>
+  <div id="filesBody" class="filesbody"></div>
+</dialog>
 
 <dialog id="viewer">
   <div class="viewerbar">

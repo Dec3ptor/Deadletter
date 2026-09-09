@@ -31,6 +31,9 @@
      small preview waits for a click. Like everything else, it resets with
      the tab. */
   var autoMedia = true;
+  var query = '';          // what is typed in the thread search
+  var unseen = 0;          // posts that arrived while scrolled away from the end
+
   /* What has already been revealed in the open thread. A thread redraws
      whenever a post arrives, and without this an attachment someone chose to
      open would fold itself back up under a Show button each time. */
@@ -97,6 +100,10 @@
     current = t;
     opened = {};
     pending = [];
+    query = '';
+    unseen = 0;
+    $('findInput').value = '';
+    $('findClear').hidden = true;
     drawAttached();
     document.body.dataset.pane = 'view';
     $('viewTitle').textContent = t.title;
@@ -112,11 +119,13 @@
     $('posts').innerHTML = '';
     try { posts = await Store.listPosts(t.id); }
     catch (e) { console.error(e); posts = []; say('Could not load this thread.'); }
-    await drawPosts();
+    await drawPosts({ toEnd: true });
 
     unsubscribe = Store.subscribe(t.id, async function (row) {
       if (posts.some(function (p) { return p.id === row.id; })) return;
       posts.push(row);
+      // someone else's post must never move the page under the reader
+      if (!atBottom()) unseen++;
       await drawPosts();
     });
   }
@@ -126,7 +135,48 @@
     $('viewState').classList.toggle('open', !locked);
     $('lockBar').hidden = !locked;
     $('compose').hidden = locked;
+    /* Searching and listing attachments both need the contents, so neither is
+       offered while the thread is still sealed. */
+    $('findBar').hidden = locked;
+    $('filesBtn').hidden = locked;
     if (locked) $('codeInput').value = '';
+  }
+
+  /* ---------- searching a thread ----------
+     Only an open thread can be searched: while it is sealed there is nothing
+     to match against but ciphertext. Plain words match the text of a post and
+     the names of its attachments; type: and has: narrow by what is attached. */
+  function parseQuery(q) {
+    var kinds = [], words = [];
+    String(q || '').trim().split(/\s+/).forEach(function (tok) {
+      if (!tok) return;
+      var m = /^(type|has):(.+)$/i.exec(tok);
+      if (!m) { words.push(tok.toLowerCase()); return; }
+      var v = m[2].toLowerCase();
+      if (v === 'file' || v === 'media' || v === 'attachment') kinds.push('any');
+      else kinds.push(v);
+    });
+    return { kinds: kinds, words: words };
+  }
+
+  function postMatches(payload, q) {
+    if (!payload || payload.broken) return false;
+    var files = payload.files || [];
+    for (var i = 0; i < q.kinds.length; i++) {
+      var want = q.kinds[i];
+      var hit = files.some(function (f) { return want === 'any' || kindOf(f) === want; });
+      if (!hit) return false;
+    }
+    if (!q.words.length) return true;
+    var hay = (payload.text || '').toLowerCase() + ' ' +
+      files.map(function (f) { return (f.name || '') + ' ' + (f.type || ''); }).join(' ').toLowerCase();
+    return q.words.every(function (w) { return hay.indexOf(w) !== -1; });
+  }
+
+  function visiblePosts(key) {
+    if (!key || !query.trim()) return posts;
+    var q = parseQuery(query);
+    return posts.filter(function (row) { return postMatches(opened[row.id], q); });
   }
 
   /* Numbers are assigned in the order people first appear in the thread, so
@@ -151,37 +201,73 @@
      newest one is allowed to reach the page. */
   var renderSeq = 0;
 
-  async function drawPosts() {
+  /* Where the reader is in the thread. A redraw must not move them: the list
+     is rebuilt from scratch on every change, so the position is measured
+     before and restored after. Scrolling to the end happens only when they
+     were already there, or when they asked for it. */
+  function atBottom() {
+    var h = $('posts');
+    return h.scrollHeight - h.scrollTop - h.clientHeight < 40;
+  }
+  function toBottom() {
+    var h = $('posts');
+    h.scrollTop = h.scrollHeight;
+    unseen = 0;
+    drawJump();
+  }
+  function drawJump() {
+    var show = !atBottom() && posts.length > 0;
+    $('jumpBtn').hidden = !show;
+    $('jumpLabel').textContent = unseen
+      ? unseen + (unseen === 1 ? ' new post' : ' new posts')
+      : 'Jump to latest';
+    $('jumpBtn').classList.toggle('fresh', unseen > 0);
+  }
+
+  async function drawPosts(opts) {
     var mine = ++renderSeq;
     var host = $('posts'), key = current && keys[current.id];
+    var wasAt = atBottom(), keepTop = host.scrollTop;
     var frag = document.createDocumentFragment();
 
-    if (!posts.length) {
-      var none = document.createElement('p');
-      none.className = 'railempty';
-      none.textContent = key
-        ? 'Nothing posted yet. You have the code, so you can be first.'
-        : 'Nothing posted yet.';
-      frag.appendChild(none);
-    } else {
+    if (key) {
       for (var i = 0; i < posts.length; i++) {
         var row = posts[i];
-        if (key && !opened[row.id]) {
-          try { opened[row.id] = await C.openPost(key, current.id, row.body); }
-          catch (e) { opened[row.id] = { broken: true }; }
-        }
+        if (opened[row.id]) continue;
+        try { opened[row.id] = await C.openPost(key, current.id, row.body); }
+        catch (e) { opened[row.id] = { broken: true }; }
         if (mine !== renderSeq) return;          // overtaken; drop this one
       }
+    }
+
+    var shown = visiblePosts(key);
+    if (!posts.length) {
+      frag.appendChild(emptyNote(key
+        ? 'Nothing posted yet. You have the code, so you can be first.'
+        : 'Nothing posted yet.'));
+    } else if (!shown.length) {
+      frag.appendChild(emptyNote('Nothing in this thread matches that.'));
+    } else {
       var names = key ? authorNames() : {};
-      for (var j = 0; j < posts.length; j++) {
-        var r2 = posts[j];
+      shown.forEach(function (r2) {
         frag.appendChild(key ? drawOpen(r2, opened[r2.id], names[r2.id]) : drawSealed(r2));
-      }
+      });
     }
 
     if (mine !== renderSeq) return;
     host.replaceChildren(frag);
-    host.scrollTop = host.scrollHeight;
+    if (opts && opts.toEnd) { host.scrollTop = host.scrollHeight; unseen = 0; }
+    else if (wasAt) { host.scrollTop = host.scrollHeight; }
+    else { host.scrollTop = keepTop; }
+    drawFindCount(key, shown.length);
+    drawJump();
+  }
+
+  function emptyNote(text) {
+    var p = document.createElement('p');
+    p.className = 'railempty';
+    p.textContent = text;
+    return p;
   }
 
   function drawSealed(row) {
@@ -440,6 +526,64 @@
   // clicking the backdrop rather than the picture closes it
   $('viewer').addEventListener('click', function (e) { if (e.target === this) this.close(); });
 
+  /* ---------- the attachment grid ----------
+     Everything attached anywhere in the thread, in one place, honouring the
+     same rule as the timeline: previews only, originals when clicked. */
+  function allAttachments() {
+    var out = [];
+    posts.forEach(function (row) {
+      var p = opened[row.id];
+      if (!p || p.broken) return;
+      (p.files || []).forEach(function (f) { out.push(f); });
+    });
+    return out;
+  }
+
+  $('filesBtn').onclick = function () {
+    var files = allAttachments(), body = $('filesBody');
+    $('filesTitle').textContent = files.length
+      ? files.length + (files.length === 1 ? ' attachment' : ' attachments') + ' in this thread'
+      : 'Attachments';
+    if (!files.length) {
+      body.replaceChildren(emptyNote('Nothing has been attached to this thread.'));
+    } else {
+      var grid = document.createElement('div');
+      grid.className = 'media';
+      files.forEach(function (f) { grid.appendChild(mediaTile(f)); });
+      body.replaceChildren(grid);
+    }
+    $('files').showModal();
+  };
+  $('filesClose').onclick = function () { $('files').close(); };
+  $('files').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+  $('files').addEventListener('close', function () { $('filesBody').replaceChildren(); });
+
+  /* ---------- searching ---------- */
+  function drawFindCount(key, n) {
+    if (!key || !query.trim()) { $('findCount').textContent = ''; return; }
+    $('findCount').textContent = n + ' of ' + posts.length;
+  }
+  var findTimer = null;
+  $('findInput').oninput = function () {
+    query = this.value;
+    $('findClear').hidden = !query;
+    clearTimeout(findTimer);
+    findTimer = setTimeout(function () { drawPosts(); }, 120);
+  };
+  $('findClear').onclick = function () {
+    query = '';
+    $('findInput').value = '';
+    this.hidden = true;
+    drawPosts();
+  };
+
+  /* ---------- staying put ---------- */
+  $('posts').addEventListener('scroll', function () {
+    if (atBottom()) unseen = 0;
+    drawJump();
+  });
+  $('jumpBtn').onclick = toBottom;
+
   $('autoMedia').onchange = function () {
     autoMedia = this.checked;
     if (autoMedia) drawPosts();
@@ -549,7 +693,7 @@
       pending = [];
       drawAttached();
       if (!posts.some(function (p) { return p.id === row.id; })) posts.push(row);
-      await drawPosts();
+      await drawPosts({ toEnd: true });   // you asked for this one
       say('Posted. It left this browser already sealed.');
       loadThreads();
     } catch (err) {
