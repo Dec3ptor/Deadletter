@@ -11,22 +11,14 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
-  var STORE_KEY = 'deadletter.config';
 
-  function saved() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); }
-    catch (e) { return null; }
-  }
-
-  var have = saved();
-  if (have) {
-    $('urlInput').value = have.supabaseUrl || '';
-    $('keyInput').value = have.supabaseAnonKey || '';
-  } else {
-    var cfg = window.DEADLETTER_CONFIG || {};
-    if (cfg.supabaseUrl && cfg.supabaseUrl.indexOf('YOUR-') === -1) $('urlInput').value = cfg.supabaseUrl;
-    if (cfg.supabaseAnonKey && cfg.supabaseAnonKey.indexOf('YOUR-') === -1) $('keyInput').value = cfg.supabaseAnonKey;
-  }
+  /* This page reads config.js and nothing else. It used to be able to keep
+     settings for the browser, which meant writing to localStorage — and the
+     site's promise is that it writes nothing at all. Checking a project and
+     printing the two lines to commit does the same job and leaves no trace. */
+  var cfg = window.DEADLETTER_CONFIG || {};
+  if (cfg.supabaseUrl && cfg.supabaseUrl.indexOf('YOUR-') === -1) $('urlInput').value = cfg.supabaseUrl;
+  if (cfg.supabaseAnonKey && cfg.supabaseAnonKey.indexOf('YOUR-') === -1) $('keyInput').value = cfg.supabaseAnonKey;
 
   function tidyUrl(v) {
     v = String(v || '').trim().replace(/\/+$/, '');
@@ -160,7 +152,6 @@
     $('setupStatus').textContent = ok
       ? 'Everything answered. Save it below to use this project in this browser.'
       : 'Something is not ready yet. Each line above says what and how to fix it.';
-    $('saveBtn').hidden = !ok;
     if (ok) writeSnippet(url, key);
   };
 
@@ -170,20 +161,6 @@
       "  supabaseUrl: '" + url + "',\n" +
       "  supabaseAnonKey: '" + key + "',";
   }
-
-  $('saveBtn').onclick = function () {
-    var url = tidyUrl($('urlInput').value), key = $('keyInput').value.trim();
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ supabaseUrl: url, supabaseAnonKey: key })); }
-    catch (e) { $('setupStatus').textContent = 'This browser refused to store the settings.'; return; }
-    $('setupStatus').textContent = 'Saved for this browser. Open Threads and it is live. To make it live for everyone, put the two lines below into config.js and commit.';
-    $('clearBtn').hidden = false;
-  };
-
-  $('clearBtn').onclick = function () {
-    localStorage.removeItem(STORE_KEY);
-    $('setupStatus').textContent = 'Cleared. This browser is back to whatever config.js says.';
-    $('clearBtn').hidden = true;
-  };
 
   $('copyBtn').onclick = async function () {
     try {
@@ -202,5 +179,4 @@
     }
   };
 
-  if (saved()) $('clearBtn').hidden = false;
 })();

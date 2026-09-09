@@ -54,7 +54,7 @@
 <dialog id="newDialog">
   <form method="dialog" class="dlg" id="newForm">
     <h2>Start a thread</h2>
-    <p>The title is public — it has to be, so the thread can be found. Everything posted inside it is not.</p>
+    <p>The title is public — it has to be, so the thread can be found. Everything posted inside it is not. A 256-bit code has been generated for you; replace it only if you have a reason to.</p>
 
     <div class="field">
       <label for="newTitle">Title</label>
@@ -64,7 +64,7 @@
     <div class="field">
       <label for="newCode">Code</label>
       <div class="row">
-        <input id="newCode" class="code" required placeholder="Give it a code, or generate one">
+        <input id="newCode" class="code" required placeholder="Give it a code, or generate one" autocomplete="off" spellcheck="false">
         <button class="btn small" id="genCodeBtn" type="button">Generate</button>
       </div>
       <p class="strength" id="strength"></p>

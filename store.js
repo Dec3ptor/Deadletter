@@ -2,10 +2,14 @@
    Deadletter — where the ciphertext goes.
 
    One interface, two implementations. Supabase is the real one: a shared
-   Postgres holding rows the server cannot read. The local one keeps the same
-   rows in this browser, so the whole app can be driven and tested without a
-   backend, and so opening the site before it is configured shows something
-   working rather than an error.
+   Postgres holding rows the server cannot read. The other keeps the same rows
+   in memory, so the board can be driven with no backend configured.
+
+   Neither writes anything to this browser. There is no localStorage here, no
+   IndexedDB, no cookie and no cache — nothing that outlives the tab. That is
+   a deliberate constraint rather than an oversight: anything written to disk
+   outlives the person who typed it, and a shared or seized machine then gives
+   up what the encryption was supposed to protect.
 
    Nothing here has ever seen a code or a key. Everything it stores arrived
    already sealed.
@@ -13,16 +17,7 @@
 (function () {
   'use strict';
 
-  /* Settings pasted into the setup page win over the committed ones, so a
-     project can be tried out in one browser before its keys are committed for
-     everyone. Nothing secret lives here — see config.js on why the anon key is
-     a public value. */
-  function saved() {
-    try { return JSON.parse(localStorage.getItem('deadletter.config') || 'null'); }
-    catch (e) { return null; }
-  }
-  var CFG = Object.assign({}, window.DEADLETTER_CONFIG || {}, saved() || {});
-  window.DEADLETTER_CONFIG = CFG;
+  var CFG = window.DEADLETTER_CONFIG || {};
   var configured = !!(CFG.supabaseUrl && CFG.supabaseAnonKey &&
     CFG.supabaseUrl.indexOf('YOUR-') === -1 && CFG.supabaseAnonKey.indexOf('YOUR-') === -1);
 
@@ -35,87 +30,51 @@
     return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
   }
 
-  /* ---------- the local store ---------- */
-  /* Rows live in localStorage; attachment bytes live in IndexedDB, because a
-     photograph does not belong in a string. Same shapes as the real thing, so
-     the app above cannot tell them apart. */
-  function localStore() {
-    var KEY = 'deadletter.rows.v1';
-    var dbp = null;
-
-    function read() {
-      try { return JSON.parse(localStorage.getItem(KEY) || '{"threads":[],"posts":[]}'); }
-      catch (e) { return { threads: [], posts: [] }; }
-    }
-    function write(data) {
-      try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
-    }
-    function db() {
-      if (dbp) return dbp;
-      dbp = new Promise(function (resolve, reject) {
-        var req = indexedDB.open('deadletter-files', 1);
-        req.onupgradeneeded = function () { req.result.createObjectStore('files'); };
-        req.onsuccess = function () { resolve(req.result); };
-        req.onerror = function () { reject(req.error); };
-      });
-      return dbp;
-    }
-    function tx(mode, fn) {
-      return db().then(function (d) {
-        return new Promise(function (resolve, reject) {
-          var t = d.transaction('files', mode), store = t.objectStore('files'), req = fn(store);
-          req.onsuccess = function () { resolve(req.result); };
-          req.onerror = function () { reject(req.error); };
-        });
-      });
-    }
+  /* ---------- the memory store ---------- */
+  /* Used when no project is configured. It keeps the same row shapes as the
+     real thing so the app above cannot tell them apart, and keeps them in
+     variables — not localStorage, not IndexedDB, not anywhere that survives
+     the tab. Closing the page loses everything, which is the correct
+     behaviour for a store that exists only to demonstrate the board. */
+  function memoryStore() {
+    var threads = [], posts = [], files = {};
+    var watchers = {};
 
     return {
-      kind: 'local',
+      kind: 'memory',
       async listThreads() {
-        return read().threads.slice().sort(function (a, b) {
+        return threads.slice().sort(function (a, b) {
           return (b.last_at || b.created_at).localeCompare(a.last_at || a.created_at);
         });
       },
       async createThread(t) {
-        var data = read();
         var row = Object.assign({ id: uuid(), created_at: nowISO(), last_at: nowISO(), post_count: 0 }, t);
-        data.threads.push(row); write(data);
+        threads.push(row);
         return row;
       },
       async listPosts(threadId) {
-        return read().posts.filter(function (p) { return p.thread_id === threadId; })
+        return posts.filter(function (p) { return p.thread_id === threadId; })
           .sort(function (a, b) { return a.created_at.localeCompare(b.created_at); });
       },
       async createPost(p) {
-        var data = read();
         var row = Object.assign({ id: uuid(), created_at: nowISO() }, p);
-        data.posts.push(row);
-        data.threads.forEach(function (t) {
+        posts.push(row);
+        threads.forEach(function (t) {
           if (t.id !== row.thread_id) return;
           t.last_at = row.created_at;
           t.post_count = (t.post_count || 0) + 1;
         });
-        write(data);
+        (watchers[row.thread_id] || []).forEach(function (fn) { fn(row); });
         return row;
       },
-      async putFile(id, bytes) { await tx('readwrite', function (s) { return s.put(bytes, id); }); return id; },
-      async getFile(id) {
-        var v = await tx('readonly', function (s) { return s.get(id); });
-        return v ? new Uint8Array(v) : null;
-      },
-      /* No server means no push. Poll instead — same callback shape, so the
-         app does not branch on which store it got. */
+      async putFile(id, bytes) { files[id] = bytes; return id; },
+      async getFile(id) { return files[id] || null; },
+      /* Nothing to poll — a post made in this tab is delivered directly. */
       subscribe(threadId, onPost) {
-        var seen = null, stopped = false;
-        var tick = async function () {
-          if (stopped) return;
-          var rows = await this.listPosts(threadId);
-          if (seen === null) seen = rows.length;
-          else if (rows.length > seen) { rows.slice(seen).forEach(onPost); seen = rows.length; }
-        }.bind(this);
-        var h = setInterval(tick, 1500);
-        return function () { stopped = true; clearInterval(h); };
+        (watchers[threadId] = watchers[threadId] || []).push(onPost);
+        return function () {
+          watchers[threadId] = (watchers[threadId] || []).filter(function (f) { return f !== onPost; });
+        };
       }
     };
   }
@@ -249,6 +208,6 @@
     };
   }
 
-  window.DeadletterStore = configured ? supabaseStore() : localStore();
+  window.DeadletterStore = configured ? supabaseStore() : memoryStore();
   window.DeadletterStore.configured = configured;
 })();

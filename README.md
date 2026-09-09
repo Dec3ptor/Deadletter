@@ -53,6 +53,32 @@ That means posts are permanent, including your own. On a public board with no
 accounts the alternative is worse: any passer-by able to erase other people's
 threads.
 
+## What it does not write to your machine
+
+Nothing. No localStorage, no sessionStorage, no cookies, no IndexedDB, no cache
+and no service worker — not the code, not the key, not the decrypted text.
+Every visit starts sealed and closing the tab is all the cleanup there is.
+
+This is checked rather than claimed: every storage API is instrumented before
+the page's scripts run, the board is used properly, and both the page and the
+browser profile are inspected afterwards.
+
+## Whether a quantum computer breaks it
+
+No, and for a structural reason: there is no public-key cryptography anywhere
+in it. Shor's algorithm breaks RSA, Diffie-Hellman and elliptic curves, and
+none of them appear here — a thread key is symmetric and shared out of band.
+
+Grover's algorithm still applies and halves the exponent, taking AES-256 down
+to a 128-bit search. That is the level most of the internet treats as strong
+today, which is why the generated code is 256 bits and not 128.
+
+The two caveats are worth more than the claim. A passphrase you invented is
+guessable regardless of quantum computing, and stretching only raises the price
+per guess. And *harvest now, decrypt later* is real here — everything is public,
+so a copy taken today can be attacked forever. A 256-bit key is the answer to
+exactly that.
+
 ## The honest limits
 
 - The thread **title** is public, along with post counts, sizes and timestamps.

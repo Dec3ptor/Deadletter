@@ -111,9 +111,18 @@
   }
 
   /* ---------- posts ---------- */
+  /* Two renders can be in flight at once — posting a message triggers one,
+     and the arrival of that same message from the store triggers another.
+     Decryption is awaited part way through, so a version that cleared the
+     list and then appended would let both halves interleave and show the
+     post twice. Each render therefore builds its own fragment, and only the
+     newest one is allowed to reach the page. */
+  var renderSeq = 0;
+
   async function drawPosts() {
+    var mine = ++renderSeq;
     var host = $('posts'), key = current && keys[current.id];
-    host.innerHTML = '';
+    var frag = document.createDocumentFragment();
 
     if (!posts.length) {
       var none = document.createElement('p');
@@ -121,18 +130,21 @@
       none.textContent = key
         ? 'Nothing posted yet. You have the code, so you can be first.'
         : 'Nothing posted yet.';
-      host.appendChild(none);
-      return;
+      frag.appendChild(none);
+    } else {
+      for (var i = 0; i < posts.length; i++) {
+        var row = posts[i];
+        if (key && !opened[row.id]) {
+          try { opened[row.id] = await C.openPost(key, current.id, row.body); }
+          catch (e) { opened[row.id] = { broken: true }; }
+        }
+        if (mine !== renderSeq) return;          // overtaken; drop this one
+        frag.appendChild(key ? drawOpen(row, opened[row.id]) : drawSealed(row));
+      }
     }
 
-    for (var i = 0; i < posts.length; i++) {
-      var row = posts[i];
-      if (key && !opened[row.id]) {
-        try { opened[row.id] = await C.openPost(key, current.id, row.body); }
-        catch (e) { opened[row.id] = { broken: true }; }
-      }
-      host.appendChild(key ? drawOpen(row, opened[row.id]) : drawSealed(row));
-    }
+    if (mine !== renderSeq) return;
+    host.replaceChildren(frag);
     host.scrollTop = host.scrollHeight;
   }
 
@@ -157,7 +169,9 @@
     el.className = 'post';
     var w = document.createElement('span');
     w.className = 'when';
-    w.textContent = when(row.created_at);
+    // the authenticated time if the post carries one, the server's if not
+    var stamp = (payload && payload.at) ? new Date(payload.at).toISOString() : row.created_at;
+    w.textContent = when(stamp);
     el.appendChild(w);
 
     if (!payload || payload.broken) {
@@ -301,7 +315,11 @@
         await Store.putFile(id, sealed);
         files.push({ id: id, name: f.name, type: f.type, size: f.size });
       }
-      var body = await C.sealPost(key, current.id, { v: 1, text: text, files: files });
+      /* The server supplies created_at, and a hostile one could supply
+         whatever it liked. The author's own clock goes inside the sealed
+         body, where it cannot be edited without failing the tag, and that is
+         the time shown when it is there. */
+      var body = await C.sealPost(key, current.id, { v: 1, at: Date.now(), text: text, files: files });
       var row = await Store.createPost({ thread_id: current.id, body: body });
 
       $('postText').value = '';
@@ -322,9 +340,13 @@
   var dlg = $('newDialog');
   $('newThreadBtn').onclick = function () {
     $('newTitle').value = '';
-    $('newCode').value = '';
-    $('strength').textContent = '';
-    $('strength').className = 'strength';
+    /* A generated key is the default rather than the alternative. Everything
+       stored here is public, so a weak code is guessable offline by anyone who
+       ever cared to — making the strong option the one you have to go out of
+       your way to discard is the only version of this that survives contact
+       with real use. */
+    $('newCode').value = C.generateCode();
+    rate();
     dlg.showModal();
     $('newTitle').focus();
   };
