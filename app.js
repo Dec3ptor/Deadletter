@@ -395,14 +395,17 @@
   $('backBtn').onclick = function () { document.body.dataset.pane = 'rail'; };
 
   /* ---------- start ---------- */
+  /* Unconfigured is a state only whoever deploys the site should ever see, so
+     it says what a reader needs and no more. Naming the pieces behind it
+     belongs in the repository, not on a public page. */
   if (!Store.configured) {
     $('modeNote').innerHTML = '';
     var b = document.createElement('b');
-    b.textContent = 'Running on local storage.';
+    b.textContent = 'Not connected.';
     $('modeNote').appendChild(b);
     $('modeNote').appendChild(document.createTextNode(
-      ' No backend is configured yet, so threads live in this browser only and nobody else can see them. ' +
-      'The encryption is real and identical either way — paste your Supabase URL and anon key into config.js and the same threads become shared.'));
+      ' Threads made here stay in this tab and are shared with nobody. ' +
+      'Everything is still sealed exactly as it would be otherwise, and nothing is kept once the tab is closed.'));
   }
   loadThreads();
 })();

@@ -1,8 +1,8 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Deadletter — encrypted public threads</title><meta name="description" content="Public threads whose contents are encrypted in your browser. Anyone can see that a thread exists; only someone with its code can read a word of it. The server holds ciphertext it cannot open."><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="app.css"></head><body data-pane="rail"><div class="wrap wide">
 
-<header class="masthead"><a class="brand" href="index.html"><span class="bar" aria-hidden="true"></span><b>Deadletter</b><span>Encrypted in<br>your browser</span></a><nav><a href="index.html" aria-current="page">Threads</a><a href="setup.html">Connect</a><a href="how-it-works.html">How it works</a></nav></header>
+<header class="masthead"><a class="brand" href="index.html"><span class="bar" aria-hidden="true"></span><b>Deadletter</b><span>Encrypted in<br>your browser</span></a><nav><a href="index.html" aria-current="page">Threads</a><a href="how-it-works.html">How it works</a></nav></header>
 
-<p class="assurance" id="modeNote"><b>Nothing here is stored in readable form.</b> Every post is sealed in your browser before it is sent. The server keeps ciphertext, timestamps and thread titles — it cannot read a post, and neither can anyone who opens this page without the code.</p>
+<p class="assurance" id="modeNote"><b>Nothing here is stored in readable form.</b> Every post is sealed in your browser before it leaves, and can only be opened again by someone holding that thread's code. Nothing is kept on your machine — no cookies, no browser storage.</p>
 
 <div class="board">
   <div class="rail">
@@ -83,15 +83,15 @@
 
 <article>
   <h2>What anyone can see</h2>
-  <p>The thread titles, how many posts each one holds, how long each post is and when it was written. That is the price of a public board: the shape of the conversation is visible even when its contents are not. If the existence of a thread is itself the secret, this is the wrong tool.</p>
+  <p>Thread titles, how busy each thread is, and when. That is the price of a public board: the shape of a conversation shows even when its contents do not. Keep the secret out of the title.</p>
 
   <h2>What the code does</h2>
-  <p>It becomes the key, in your browser, and never travels. A generated code carries 256 random bits and is used as the key directly. A code you invent is stretched with 600,000 rounds of PBKDF2, which makes each guess expensive but cannot save a code that was guessable to begin with — and since every byte here is public, an attacker can guess offline, forever, without anyone noticing. Use the generated one.</p>
+  <p>It becomes the key, in your browser, and never travels. Generate one and it is 256 random bits — not guessable by anyone, ever. Type your own and it is only as good as it is, and everything here is public enough to guess at privately for years. Use the generated one.</p>
 
   <h2>Everyone with the code is equal</h2>
-  <p>There are no accounts and no owners. Anyone holding the code can read the thread and post to it, and a code cannot be taken back once given — the only way to remove someone is to start a new thread with a new code. Posts cannot be edited or deleted by anyone, including whoever wrote them.</p>
+  <p>No accounts, no owners. Anyone holding the code can read the thread and post to it, and a code cannot be taken back once given. Nothing can be edited or deleted afterwards, by anyone.</p>
 
-  <p><a href="how-it-works.html">How it works</a> sets out the whole design, including what it does not protect against.</p>
+  <p><a href="how-it-works.html">How it works</a> sets out what this protects, what it leaves in the open, and what it cannot do.</p>
 </article>
 
 <footer><span>Deadletter</span><a href="how-it-works.html">How it works</a><a href="https://dec3ptor.github.io/Redacted/">Blackout</a></footer>

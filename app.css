@@ -181,33 +181,3 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .viewhead,.compose,.lockbar{padding-left:14px;padding-right:14px}
 }
 
-/* ---------- connecting a project ---------- */
-.setupform{border:2px solid var(--ink);padding:18px;margin:26px 0 0;max-width:var(--measure)}
-.setupform .field{margin-bottom:14px}
-.setupform label{display:block;font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--g70);margin:0 0 6px}
-.setupform input{
-  width:100%;font-size:16px;line-height:1;color:var(--ink);
-  padding:11px 12px;border:1.5px solid var(--ink);border-radius:0;background:var(--paper);
-  -webkit-appearance:none;appearance:none;
-}
-.setupform input.code{font-family:var(--mono);font-size:13px}
-.setupbar{display:flex;gap:9px;flex-wrap:wrap}
-
-.checks{list-style:none;padding:0;margin:18px 0 0;max-width:var(--measure);border-top:1px solid var(--g25)}
-.chk{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--g12)}
-.chk .mark{
-  font-family:var(--mono);font-size:15px;line-height:1.4;width:22px;flex:none;text-align:center;
-  border:1.5px solid var(--ink);
-}
-.chk.ok .mark{background:var(--ink);color:var(--paper)}
-.chk.bad .mark{background:var(--paper);color:var(--ink)}
-.chk.warn .mark{border-style:dashed;color:var(--g70)}
-.chk strong{display:block;font-size:16px;font-weight:600;letter-spacing:-.01em}
-.chk span{display:block;font-size:14.5px;color:var(--g70);line-height:1.5;margin-top:2px}
-.chk .fix{color:var(--ink);margin-top:5px}
-
-.snippet{
-  font-family:var(--mono);font-size:13px;line-height:1.5;
-  border:1.5px solid var(--ink);padding:12px 13px;margin:0 0 10px;
-  max-width:var(--measure);overflow-x:auto;white-space:pre;
-}

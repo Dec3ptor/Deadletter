@@ -44,6 +44,28 @@ The anon key belongs in a public file — it names the project and nothing more,
 and the policies decide what it may do. **Never** put the `service_role` key
 anywhere near this repository; that one bypasses every policy.
 
+### If it does not connect
+
+The SQL editor runs a script as one transaction, so a failure near the end can
+roll back the tables created at the start — leaving you certain the tables
+exist when nothing was created. The script guards against that now: the
+storage and realtime parts raise a `NOTICE` and carry on rather than taking
+everything with them. Read the output for those notices; neither part is
+needed for text-only threads.
+
+To check what a project actually has, from the browser console on the site:
+
+```js
+const { supabaseUrl: u, supabaseAnonKey: k } = window.DEADLETTER_CONFIG;
+for (const t of ['threads', 'posts'])
+  console.log(t, (await fetch(`${u}/rest/v1/${t}?select=id&limit=1`,
+    { headers: { apikey: k, Authorization: `Bearer ${k}` } })).status);
+```
+
+`200` means the table is there and readable. `404` means the script has not
+run against this project. `401` or `403` means the table exists but the read
+policy is missing.
+
 ## What the policies allow
 
 Anyone may read. Anyone may append. Nobody may edit or delete anything, ever —
