@@ -273,6 +273,7 @@
   function drawSealed(row) {
     var el = document.createElement('div');
     el.className = 'post locked';
+    el.dataset.id = row.id;
     var w = document.createElement('span');
     w.className = 'when';
     w.textContent = when(row.created_at) + ' · sealed';
@@ -289,6 +290,7 @@
   function drawOpen(row, payload, name) {
     var el = document.createElement('div');
     el.className = 'post';
+    el.dataset.id = row.id;
 
     var head = document.createElement('span');
     head.className = 'when';
@@ -487,17 +489,33 @@
     liveURLs = [];
   }
 
+  /* ---------- modals ----------
+     Anything on top gets the page held still underneath it. Without this the
+     thread scrolls away behind the picture you are looking at, and on a phone
+     a drag anywhere near the edge of a full-screen image moves the page
+     rather than doing nothing, which is what it should do. */
+  function openModal(id) {
+    var d = $(id);
+    if (!d.open) d.showModal();
+    document.documentElement.classList.add('modalopen');
+  }
+  function modalClosed() {
+    if (!$('viewer').open && !$('files').open && !$('newDialog').open) {
+      document.documentElement.classList.remove('modalopen');
+    }
+  }
+
   /* ---------- full size ---------- */
   var viewerURL = null;
   async function openFull(f) {
-    var body = $('viewerBody'), dlg = $('viewer');
+    var body = $('viewerBody');
     body.replaceChildren();
     $('viewerName').textContent = (f.name || '') + (f.size ? ' · ' + bytesLabel(f.size) : '');
     var note = document.createElement('p');
     note.className = 'loading';
     note.textContent = 'unsealing the original…';
     body.appendChild(note);
-    if (!dlg.open) dlg.showModal();
+    openModal('viewer');
     try {
       var url = await openAsURL(f.id, f.type);
       if (viewerURL) { try { URL.revokeObjectURL(viewerURL); } catch (e) {} }
@@ -522,6 +540,7 @@
   $('viewer').addEventListener('close', function () {
     $('viewerBody').replaceChildren();
     if (viewerURL) { try { URL.revokeObjectURL(viewerURL); } catch (e) {} viewerURL = null; }
+    modalClosed();
   });
   // clicking the backdrop rather than the picture closes it
   $('viewer').addEventListener('click', function (e) { if (e.target === this) this.close(); });
@@ -530,33 +549,112 @@
      Everything attached anywhere in the thread, in one place, honouring the
      same rule as the timeline: previews only, originals when clicked. */
   function allAttachments() {
-    var out = [];
+    var names = authorNames(), out = [];
     posts.forEach(function (row) {
       var p = opened[row.id];
       if (!p || p.broken) return;
-      (p.files || []).forEach(function (f) { out.push(f); });
+      (p.files || []).forEach(function (f) {
+        out.push({
+          f: f,
+          postId: row.id,
+          who: names[row.id] || '',
+          at: p.at ? new Date(p.at).toISOString() : row.created_at,
+        });
+      });
     });
     return out;
   }
 
-  $('filesBtn').onclick = function () {
-    var files = allAttachments(), body = $('filesBody');
-    $('filesTitle').textContent = files.length
-      ? files.length + (files.length === 1 ? ' attachment' : ' attachments') + ' in this thread'
+  var filesFilter = 'all';
+  var FILE_KINDS = [['all', 'All'], ['image', 'Images'], ['gif', 'GIFs'], ['video', 'Video']];
+
+  /* Filters are offered only for the kinds actually in the thread, and only
+     when there is more than one of them — a row of chips above eight photos
+     that are all photos is furniture, not a control. */
+  function drawFileFilters(all) {
+    var counts = {};
+    all.forEach(function (e) { var k = kindOf(e.f); counts[k] = (counts[k] || 0) + 1; });
+    var avail = FILE_KINDS.filter(function (k) { return k[0] === 'all' || counts[k[0]]; });
+    var worth = all.length > 1 && avail.length > 2;
+    $('filesBar').hidden = !worth;
+    if (!worth) { filesFilter = 'all'; return counts; }
+    if (filesFilter !== 'all' && !counts[filesFilter]) filesFilter = 'all';
+    var host = $('filesFilters');
+    host.replaceChildren();
+    avail.forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip' + (filesFilter === k[0] ? ' on' : '');
+      b.setAttribute('aria-pressed', filesFilter === k[0] ? 'true' : 'false');
+      b.textContent = k[1] + ' ' + (k[0] === 'all' ? all.length : counts[k[0]]);
+      b.onclick = function () { filesFilter = k[0]; drawFiles(); };
+      host.appendChild(b);
+    });
+    return counts;
+  }
+
+  function fileCard(e) {
+    var tile = mediaTile(e.f);
+    var meta = document.createElement('div');
+    meta.className = 'tilemeta';
+    var from = document.createElement('span');
+    from.textContent = (e.who ? e.who + ' · ' : '') + when(e.at);
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'inthread';
+    go.textContent = 'In thread';
+    go.title = 'Show the post this came from';
+    go.onclick = function () { showInThread(e.postId); };
+    meta.appendChild(from);
+    meta.appendChild(go);
+    tile.appendChild(meta);
+    return tile;
+  }
+
+  function drawFiles() {
+    var all = allAttachments(), body = $('filesBody');
+    $('filesTitle').textContent = all.length
+      ? all.length + (all.length === 1 ? ' attachment' : ' attachments') + ' in this thread'
       : 'Attachments';
-    if (!files.length) {
-      body.replaceChildren(emptyNote('Nothing has been attached to this thread.'));
-    } else {
-      var grid = document.createElement('div');
-      grid.className = 'media';
-      files.forEach(function (f) { grid.appendChild(mediaTile(f)); });
-      body.replaceChildren(grid);
+    drawFileFilters(all);
+    var shown = all.filter(function (e) { return filesFilter === 'all' || kindOf(e.f) === filesFilter; });
+    $('filesCount').textContent = filesFilter === 'all' ? '' : shown.length + ' of ' + all.length;
+    if (!shown.length) {
+      body.replaceChildren(emptyNote(all.length
+        ? 'Nothing of that kind is attached to this thread.'
+        : 'Nothing has been attached to this thread.'));
+      return;
     }
-    $('files').showModal();
-  };
+    var grid = document.createElement('div');
+    grid.className = 'media filesgrid';
+    shown.forEach(function (e) { grid.appendChild(fileCard(e)); });
+    body.replaceChildren(grid);
+    body.scrollTop = 0;
+  }
+
+  /* Going from an attachment back to what was said around it. A search in
+     progress would hide the post it lands on, so it is cleared first. */
+  async function showInThread(id) {
+    $('files').close();
+    if (query.trim()) {
+      query = '';
+      $('findInput').value = '';
+      $('findClear').hidden = true;
+      await drawPosts();
+    }
+    var kids = $('posts').children, el = null;
+    for (var i = 0; i < kids.length; i++) if (kids[i].dataset.id === id) el = kids[i];
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 1400);
+    drawJump();
+  }
+
+  $('filesBtn').onclick = function () { filesFilter = 'all'; drawFiles(); openModal('files'); };
   $('filesClose').onclick = function () { $('files').close(); };
   $('files').addEventListener('click', function (e) { if (e.target === this) this.close(); });
-  $('files').addEventListener('close', function () { $('filesBody').replaceChildren(); });
+  $('files').addEventListener('close', function () { $('filesBody').replaceChildren(); modalClosed(); });
 
   /* ---------- searching ---------- */
   function drawFindCount(key, n) {
@@ -714,7 +812,7 @@
        with real use. */
     $('newCode').value = C.generateCode();
     rate();
-    dlg.showModal();
+    openModal('newDialog');
     $('newTitle').focus();
   };
   $('genCodeBtn').onclick = function () {
@@ -759,6 +857,8 @@
     $('createBtn').disabled = false;
   };
 
+  dlg.addEventListener('close', modalClosed);
+
   $('backBtn').onclick = function () { document.body.dataset.pane = 'rail'; };
 
   /* ---------- start ---------- */
@@ -766,13 +866,19 @@
      it says what a reader needs and no more. Naming the pieces behind it
      belongs in the repository, not on a public page. */
   if (!Store.configured) {
+    document.body.classList.add('unconfigured');
     $('modeNote').innerHTML = '';
     var b = document.createElement('b');
     b.textContent = 'Not connected.';
     $('modeNote').appendChild(b);
-    $('modeNote').appendChild(document.createTextNode(
+    /* The detail is worth a line on a desktop and worth the whole thread on a
+       phone, so it is marked as the part that gives way when space is short. */
+    var rest = document.createElement('span');
+    rest.className = 'long';
+    rest.textContent =
       ' Threads made here stay in this tab and are shared with nobody. ' +
-      'Everything is still sealed exactly as it would be otherwise, and nothing is kept once the tab is closed.'));
+      'Everything is still sealed exactly as it would be otherwise, and nothing is kept once the tab is closed.';
+    $('modeNote').appendChild(rest);
   }
   loadThreads();
 })();

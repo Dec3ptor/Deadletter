@@ -1,8 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Deadletter — encrypted public threads</title><meta name="description" content="Public threads whose contents are encrypted in your browser. Anyone can see that a thread exists; only someone with its code can read a word of it. The server holds ciphertext it cannot open."><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="app.css"></head><body data-pane="rail"><div class="wrap wide">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Deadletter — encrypted public threads</title><meta name="description" content="Public threads whose contents are encrypted in your browser. Anyone can see that a thread exists; only someone with its code can read a word of it. The server holds ciphertext it cannot open."><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="app.css"></head><body data-pane="rail" class="appshell"><div class="wrap wide">
 
 <header class="masthead"><a class="brand" href="index.html"><span class="bar" aria-hidden="true"></span><b>Deadletter</b><span>Encrypted in<br>your browser</span></a><nav><a href="index.html" aria-current="page">Threads</a><a href="how-it-works.html">How it works</a></nav></header>
-
-<p class="assurance" id="modeNote"><b>Nothing here is stored in readable form.</b> Every post is sealed in your browser before it leaves, and can only be opened again by someone holding that thread's code. Nothing is kept on your machine — no cookies, no browser storage.</p>
 
 <div class="board">
   <div class="rail">
@@ -11,7 +9,7 @@
       <button class="btn small" id="newThreadBtn" type="button">New thread</button>
     </div>
     <ul class="raillist" id="railList"></ul>
-    <p class="railempty" id="railEmpty" hidden>No threads yet. Start one — you choose its code, and only people you give the code to can read what goes in it.</p>
+    <p class="railempty" id="railEmpty" hidden>No threads yet. Start one.</p>
   </div>
 
   <div class="view">
@@ -39,7 +37,7 @@
 
     <div class="viewempty" id="viewEmpty">
       <strong>Pick a thread, or start one.</strong>
-      Every thread on the left is readable by anyone holding its code and by nobody else. Open one and you will see exactly what the server sees: sealed bytes, until you enter the code.
+      Nothing in a thread can be read without its code.
     </div>
 
     <div class="lockbar" id="lockBar" hidden>
@@ -51,12 +49,12 @@
 
     <form class="compose" id="compose" hidden>
       <label class="vh" for="postText">Your post</label>
-      <textarea id="postText" placeholder="Write something. Links become links; images and video can be attached."></textarea>
+      <textarea id="postText" rows="2" placeholder="Write something. Attach images or video."></textarea>
       <div class="attached" id="attached"></div>
       <div class="composebar">
         <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
         <button class="btn small" id="attachBtn" type="button">Attach</button>
-        <label class="toggle"><input type="checkbox" id="autoMedia" checked> Load media automatically</label>
+        <label class="toggle"><input type="checkbox" id="autoMedia" checked> Auto-load media</label>
         <span class="grow"></span>
         <button class="btn solid" id="postBtn" type="submit">Post</button>
       </div>
@@ -64,12 +62,16 @@
   </div>
 </div>
 
-<p id="status" role="status"></p>
+<p class="appfoot"><span id="status" role="status"></span><span class="note" id="modeNote">Sealed in your browser. Nothing is kept on this machine.</span></p>
 
 <dialog id="files">
   <div class="viewerbar">
     <span id="filesTitle">Attachments</span>
     <button class="btn small" id="filesClose" type="button">Close</button>
+  </div>
+  <div class="filesbar" id="filesBar" hidden>
+    <div class="chips" id="filesFilters"></div>
+    <span class="findcount" id="filesCount"></span>
   </div>
   <div id="filesBody" class="filesbody"></div>
 </dialog>
@@ -112,20 +114,7 @@
   </form>
 </dialog>
 
-<article>
-  <h2>What anyone can see</h2>
-  <p>Thread titles, how busy each thread is, and when. That is the price of a public board: the shape of a conversation shows even when its contents do not. Keep the secret out of the title.</p>
 
-  <h2>What the code does</h2>
-  <p>It becomes the key, in your browser, and never travels. Generate one and it is 256 random bits — not guessable by anyone, ever. Type your own and it is only as good as it is, and everything here is public enough to guess at privately for years. Use the generated one.</p>
-
-  <h2>Everyone with the code is equal</h2>
-  <p>No accounts, no owners. Anyone holding the code can read the thread and post to it, and a code cannot be taken back once given. Nothing can be edited or deleted afterwards, by anyone.</p>
-
-  <p><a href="how-it-works.html">How it works</a> sets out what this protects, what it leaves in the open, and what it cannot do.</p>
-</article>
-
-<footer><span>Deadletter</span><a href="how-it-works.html">How it works</a><a href="https://dec3ptor.github.io/Redacted/">Blackout</a></footer>
 </div>
 
 <script src="config.js"></script>
